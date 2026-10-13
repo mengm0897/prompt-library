@@ -1,0 +1,9 @@
+.taxonomy-help{color:#647b89;font-size:14px;line-height:1.6}
+.taxonomy-list{display:grid;gap:8px;max-height:32vh;overflow:auto;margin:18px 0;padding-right:4px}
+.taxonomy-row{display:grid;gap:5px;background:#f4f8f9;border:1px solid #e3edef;border-radius:9px;padding:10px 12px}
+.taxonomy-row strong{font-size:14px;color:#1d5661}
+.taxonomy-row span{font-size:13px;color:#607684;line-height:1.5}
+.taxonomy-form{display:flex;align-items:end;gap:10px;margin:14px 0}
+.taxonomy-form label{flex:1;display:grid;gap:5px;font-size:13px;color:#4a6473}
+.taxonomy-form input,.taxonomy-form select{border:1px solid #d7e3e7;border-radius:9px;background:white;padding:10px;color:#233b4c;width:100%}
+@media(max-width:540px){.taxonomy-form{display:grid}.taxonomy-form button{width:100%}}

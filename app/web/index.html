@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#17324b">
+  <title>Prompt 库</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/attachments.css">
+  <link rel="stylesheet" href="/taxonomy.css">
+  <link rel="stylesheet" href="/reader.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">P</div><div><strong>Prompt 库</strong><small>私人提示词工作台</small></div></div>
+      <div class="side-label">按用途浏览</div>
+      <nav id="categories" aria-label="提示词分类"></nav>
+      <div class="side-bottom"><div class="side-label">资料管理</div><button id="taxonomyBtn" class="side-action">管理大类与子类</button><button id="exportBtn" class="side-action">导出备份</button><button id="importBtn" class="side-action">导入备份</button><input id="importFile" type="file" accept="application/json,.json" hidden><p>数据只保存在这台电脑</p></div>
+    </aside>
+    <main>
+      <header class="topbar"><div><span class="eyebrow">PROMPT LIBRARY</span><h1>找到想用的那一句指令。</h1><p>浏览旧提示词，也把新的灵感随时收进来。</p></div><button id="newBtn" class="primary">＋ 新增提示词</button></header>
+      <div class="toolbar"><label class="search"><span>⌕</span><input id="search" type="search" placeholder="搜索标题、正文、子类或标签" autocomplete="off"></label><select id="subcategoryFilter" aria-label="子类筛选"><option value="all">全部子类</option></select><select id="statusFilter" aria-label="状态筛选"><option value="all">全部状态</option><option value="active">可使用</option><option value="reference">历史参考</option><option value="archived">已归档</option></select><select id="tagFilter" aria-label="标签筛选"><option value="all">全部标签</option></select></div>
+      <div class="section-line"><h2 id="viewTitle">全部提示词</h2><span id="resultCount"></span></div>
+      <div id="cards" class="cards"></div>
+      <div id="empty" class="empty" hidden><strong>这里暂时没有匹配的提示词</strong><p>试试其他关键词，或新增一条提示词。</p></div>
+    </main>
+  </div>
+  <dialog id="detailDialog" class="detail-dialog"><div class="dialog-head"><div><span id="detailCategory" class="eyebrow"></span><div class="title-edit-line"><h2 id="detailTitle"></h2><button id="renameBtn" class="title-edit-btn" type="button">修改标题</button></div></div><button class="icon-close" data-close="detailDialog" aria-label="关闭">×</button></div><div id="detailMeta" class="detail-meta"></div><div id="detailNote" class="detail-note"></div><div class="reader-switch" role="group" aria-label="正文查看方式"><button id="renderedViewBtn" type="button" class="active" aria-pressed="true">排版阅读</button><button id="rawViewBtn" type="button" aria-pressed="false">Markdown 原文</button></div><div id="detailBody" class="detail-body markdown-body"></div><pre id="detailRaw" class="detail-body" hidden></pre><div id="attachments" class="attachments"></div><div class="dialog-actions"><button id="copyBtn" class="primary">复制原文</button><button id="editBtn" class="quiet">编辑标题与正文</button><button id="archiveBtn" class="quiet">归档</button></div></dialog>
+  <dialog id="editDialog" class="edit-dialog"><form id="promptForm"><div class="dialog-head"><h2 id="formTitle">新增提示词</h2><button type="button" class="icon-close" data-close="editDialog" aria-label="关闭">×</button></div><div class="form-grid"><label class="full">标题<input name="title" required maxlength="180" placeholder="给这条提示词起个好找的名字"></label><label>一级分类<select name="category" id="categorySelect"></select></label><label>子类<select name="subcategory" id="subcategorySelect"></select></label><label>状态<select name="status"><option value="active">可使用</option><option value="reference">历史参考</option><option value="archived">已归档</option></select></label><label class="full">标签 <span class="hint">用逗号分隔</span><input name="tags" placeholder="例如：写作，学习，工作"></label><label class="full">提示词正文<textarea name="body" required rows="14" placeholder="把新的提示词粘贴在这里"></textarea><input id="promptFile" type="file" accept=".md,.txt,text/plain,text/markdown" hidden><button id="choosePromptFile" type="button" class="quiet">从 .md 或 .txt 文件导入正文</button></label><label class="full">使用备注<textarea name="note" rows="3" placeholder="适用场景、效果或需要调整的地方"></textarea></label><label class="full">来源<input name="source" placeholder="手动新增"></label></div><div class="dialog-actions"><button type="button" class="quiet" data-close="editDialog">取消</button><button type="submit" class="primary">保存提示词</button></div></form></dialog>
+  <dialog id="taxonomyDialog" class="edit-dialog"><div class="dialog-head"><h2>分类管理</h2><button class="icon-close" data-close="taxonomyDialog" aria-label="关闭">×</button></div><p class="taxonomy-help">先添加大类，再添加子类。新增分类只增加可选项，不改变已有提示词的归类。</p><div id="taxonomyList" class="taxonomy-list"></div><form id="categoryForm" class="taxonomy-form"><label>新增大类<input name="category" maxlength="40" required placeholder="例如：研究与学习"></label><button class="quiet" type="submit">添加大类</button></form><form id="subcategoryForm" class="taxonomy-form"><label>所属大类<select name="category" id="taxonomyCategory"></select></label><label>新增子类<input name="subcategory" maxlength="80" required placeholder="例如：资料整理"></label><button class="quiet" type="submit">添加子类</button></form></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="/markdown.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
