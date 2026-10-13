@@ -15,7 +15,7 @@ with tempfile.TemporaryDirectory() as temporary:
     md_store.atomic_write(md_store.TAXONOMY, json.dumps(terms, ensure_ascii=False))
     item = {
         "id": 1, "title": "测试", "category": "内容创作", "subcategory": "PPT风格",
-        "tags": ["视觉"], "status": "active", "source": "测试", "note": "",
+        "status": "active",
         "created_at": "2026-10-11", "updated_at": "2026-10-11", "import_key": None,
         "body": "# 很长的正文\n\n原样保留。\n",
     }

@@ -1,6 +1,7 @@
 """Check a clean public copy with fictional examples and a saved prompt."""
 
 import json
+import sqlite3
 import shutil
 import socket
 import subprocess
@@ -8,7 +9,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 SOURCE = Path(__file__).resolve().parents[1]
@@ -61,15 +62,40 @@ with tempfile.TemporaryDirectory(prefix="prompt-clean-start-") as directory:
     try:
         initial = request(base, "/api/prompts")
         assert len(initial["prompts"]) == 2
-        assert all(item["source"] == "内置虚构示例" for item in initial["prompts"])
+        assert all(set(item).isdisjoint({"tags", "note", "source"}) for item in initial["prompts"])
         assert set(initial["categories"]) == {"写作", "学习", "工作", "生活"}
         created = request(base, "/api/prompts", "POST", {
             "title": "虚构测试提示词", "category": initial["categories"][0],
-            "subcategory": "", "tags": ["测试"], "body": "请写一句问候语。",
-            "note": "", "source": "测试", "status": "active",
+            "subcategory": "", "body": "请写一句问候语。", "status": "active",
         })
         assert created["id"] == 3
         assert (root / "prompts" / "0003.md").is_file()
+        renamed = request(base, "/api/taxonomy", "PATCH", {
+            "level": "category", "category": "工作", "name": "工作事务"})
+        assert renamed["moved"] == 1
+        assert request(base, "/api/prompts/1")["category"] == "工作事务"
+        renamed_sub = request(base, "/api/taxonomy", "PATCH", {
+            "level": "subcategory", "category": "工作事务",
+            "subcategory": "整理信息", "name": "事项整理"})
+        assert renamed_sub["moved"] == 1
+        assert request(base, "/api/prompts/1")["subcategory"] == "事项整理"
+        try:
+            request(base, "/api/taxonomy", "DELETE", {
+                "level": "subcategory", "category": "工作事务", "subcategory": "事项整理"})
+            raise AssertionError("Used subcategory was deleted without migration")
+        except HTTPError as error:
+            assert error.code == 400
+        deleted_sub = request(base, "/api/taxonomy", "DELETE", {
+            "level": "subcategory", "category": "工作事务",
+            "subcategory": "事项整理", "target_category": "工作事务", "target_subcategory": ""})
+        assert deleted_sub["moved"] == 1
+        deleted_category = request(base, "/api/taxonomy", "DELETE", {
+            "level": "category", "category": "工作事务",
+            "target_category": "生活", "target_subcategory": ""})
+        assert deleted_category["moved"] == 1
+        assert request(base, "/api/prompts/1")["category"] == "生活"
+        assert "工作事务" not in request(base, "/api/taxonomy")
+        assert "category: \"生活\"" in (root / "prompts" / "0001.md").read_text()
         backup = request(base, "/api/backup")
         assert backup["format"] == "prompt-library-v1"
         assert len(backup["prompts"]) == 3
@@ -79,12 +105,26 @@ with tempfile.TemporaryDirectory(prefix="prompt-clean-start-") as directory:
         process.terminate()
         process.wait(timeout=5)
 
+    # An older local library can still start; obsolete metadata disappears from
+    # both Markdown and SQLite while the prompt body remains intact.
+    legacy_file = root / "prompts" / "0003.md"
+    legacy_text = legacy_file.read_text(encoding="utf-8")
+    legacy_file.write_text(legacy_text.replace('status: "active"',
+        'tags: ["旧标签"]\nsource: "本机旧路径"\nnote: "旧说明"\nstatus: "active"'), encoding="utf-8")
+    with sqlite3.connect(root / "data" / "prompts.sqlite3") as db:
+        db.execute("ALTER TABLE prompts ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'")
+        db.execute("ALTER TABLE prompts ADD COLUMN source TEXT NOT NULL DEFAULT ''")
+        db.execute("ALTER TABLE prompts ADD COLUMN note TEXT NOT NULL DEFAULT ''")
+
     process, base = start(root, port)
     try:
         restored = request(base, "/api/prompts")
         assert len(restored["prompts"]) == 3
         assert next(item for item in restored["prompts"] if item["id"] == 3)["body"] == "请写一句问候语。"
         assert (root / "data" / "prompts.sqlite3").is_file()
+        assert "旧标签" not in legacy_file.read_text(encoding="utf-8")
+        with sqlite3.connect(root / "data" / "prompts.sqlite3") as db:
+            assert "tags" not in {row[1] for row in db.execute("PRAGMA table_info(prompts)")}
     finally:
         process.terminate()
         process.wait(timeout=5)

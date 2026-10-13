@@ -1,8 +1,4 @@
 .detail-dialog{width:min(920px,calc(100vw - 30px))}
-.title-edit-line{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
-.title-edit-line h2{margin-bottom:8px}
-.title-edit-btn{border:0;background:transparent;color:#176e79;font-size:12px;font-weight:700;padding:3px 0;white-space:nowrap;text-decoration:underline;text-underline-offset:3px}
-.title-edit-btn:hover{color:#105762}
 .reader-switch{display:flex;gap:4px;width:max-content;background:#ebf2f3;border-radius:9px;padding:4px;margin:17px 0 10px}
 .reader-switch button{border:0;background:transparent;color:#58717e;border-radius:7px;padding:7px 12px;font-size:13px;font-weight:600}
 .reader-switch button.active{background:#fff;color:#145965;box-shadow:0 1px 5px #193d501c}
@@ -30,4 +26,4 @@
 .markdown-body th,.markdown-body td{border:1px solid #d9e7e9;padding:8px 10px;text-align:left;min-width:70px}
 .markdown-body th{background:#edf5f5;color:#285d68}
 .markdown-body hr{border:0;border-top:1px solid #d9e7e9;margin:24px 0}
-@media(max-width:540px){.markdown-body{padding:17px}.title-edit-line{display:block}.title-edit-btn{margin-bottom:10px}.reader-switch{max-width:100%}}
+@media(max-width:540px){.markdown-body{padding:17px}.reader-switch{max-width:100%}}

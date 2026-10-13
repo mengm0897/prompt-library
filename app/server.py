@@ -31,23 +31,32 @@ def connect():
     db = sqlite3.connect(DB)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA journal_mode=WAL")
+    old_columns = {x[1] for x in db.execute("PRAGMA table_info(prompts)")}
+    if old_columns and {"tags", "note", "source"} & old_columns:
+        db.execute("""CREATE TABLE prompts_new (
+            id INTEGER PRIMARY KEY, title TEXT NOT NULL, category TEXT NOT NULL,
+            subcategory TEXT NOT NULL DEFAULT '', body TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'active', created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL, import_key TEXT UNIQUE)""")
+        db.execute("""INSERT INTO prompts_new
+            (id,title,category,subcategory,body,status,created_at,updated_at,import_key)
+            SELECT id,title,category,subcategory,body,status,created_at,updated_at,import_key FROM prompts""")
+        db.execute("DROP TABLE prompts")
+        db.execute("ALTER TABLE prompts_new RENAME TO prompts")
+        db.execute("CREATE TABLE IF NOT EXISTS md_state (id INTEGER PRIMARY KEY, digest TEXT NOT NULL)")
+        db.execute("DELETE FROM md_state")
     db.execute("""CREATE TABLE IF NOT EXISTS prompts (
         id INTEGER PRIMARY KEY, title TEXT NOT NULL, category TEXT NOT NULL,
         subcategory TEXT NOT NULL DEFAULT '',
-        tags TEXT NOT NULL DEFAULT '[]', body TEXT NOT NULL,
-        note TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT '',
+        body TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'active', created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL, import_key TEXT UNIQUE)""")
-    if "subcategory" not in {x[1] for x in db.execute("PRAGMA table_info(prompts)")}:
-        db.execute("ALTER TABLE prompts ADD COLUMN subcategory TEXT NOT NULL DEFAULT ''")
     db.commit()
     return db
 
 
 def serialize(row):
-    item = dict(row)
-    item["tags"] = json.loads(item["tags"])
-    return item
+    return dict(row)
 
 
 def validate(payload):
@@ -64,16 +73,10 @@ def validate(payload):
     md_store.check_selection({"category": category, "subcategory": subcategory})
     if len(subcategory) > 80:
         raise ValueError("子类不能超过80字")
-    tags = payload.get("tags", [])
-    if not isinstance(tags, list) or len(tags) > 20:
-        raise ValueError("标签最多20个")
-    tags = list(dict.fromkeys(str(t).strip()[:50] for t in tags if str(t).strip()))
-    note = str(payload.get("note", ""))[:5000]
-    source = str(payload.get("source", "手动新增"))[:500]
     status = str(payload.get("status", "active"))
     if status not in ("active", "reference", "archived"):
         raise ValueError("无效状态")
-    return title, category, subcategory, json.dumps(tags, ensure_ascii=False), body, note, source, status
+    return title, category, subcategory, body, status
 
 
 def ensure_taxonomy():
@@ -101,23 +104,129 @@ def sync_from_markdown():
             baseline_row = db.execute("SELECT digest FROM md_state WHERE id=?", (item["id"],)).fetchone()
             file_hash = md_store.digest(item)
             if baseline_row and file_hash == baseline_row[0]:
+                canonical = md_store.render(item)
+                if path.read_text(encoding="utf-8") != canonical:
+                    md_store.atomic_write(path, canonical)
                 continue
             if prior:
                 db_item = serialize(prior)
                 if baseline_row and md_store.digest(db_item) != baseline_row[0] and md_store.digest(db_item) != file_hash:
                     raise ValueError(f"{path.name} 与网页索引均已修改，请先核对")
-                db.execute("""UPDATE prompts SET title=?,category=?,subcategory=?,tags=?,body=?,note=?,source=?,status=?,created_at=?,updated_at=?,import_key=? WHERE id=?""",
+                db.execute("""UPDATE prompts SET title=?,category=?,subcategory=?,body=?,status=?,created_at=?,updated_at=?,import_key=? WHERE id=?""",
                            (*values, item["created_at"], item["updated_at"], item["import_key"], item["id"]))
             else:
-                db.execute("""INSERT INTO prompts (title,category,subcategory,tags,body,note,source,status,created_at,updated_at,import_key,id)
-                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""", (*values, item["created_at"], item["updated_at"], item["import_key"], item["id"]))
+                db.execute("""INSERT INTO prompts (title,category,subcategory,body,status,created_at,updated_at,import_key,id)
+                           VALUES (?,?,?,?,?,?,?,?,?)""", (*values, item["created_at"], item["updated_at"], item["import_key"], item["id"]))
             db.execute("INSERT OR REPLACE INTO md_state VALUES (?,?)", (item["id"], file_hash))
+            canonical = md_store.render(item)
+            if path.read_text(encoding="utf-8") != canonical:
+                md_store.atomic_write(path, canonical)
 
 
 def write_web_change(db, item):
     md_store.atomic_write(md_store.path_for(item["id"]), md_store.render(item))
     db.execute("CREATE TABLE IF NOT EXISTS md_state (id INTEGER PRIMARY KEY, digest TEXT NOT NULL)")
     db.execute("INSERT OR REPLACE INTO md_state VALUES (?,?)", (item["id"], md_store.digest(item)))
+
+
+def category_name(value, limit, label):
+    name = str(value or "").strip()
+    if not name or len(name) > limit or any(ch in name for ch in "\r\n/\\"):
+        raise ValueError(f"{label}名称需为1至{limit}字，不能包含换行或斜杠")
+    return name
+
+
+def change_taxonomy(payload, action):
+    """Change the vocabulary and every affected Markdown/SQLite record together."""
+    if not isinstance(payload, dict):
+        raise ValueError("分类操作内容无效")
+    level = payload.get("level")
+    if level not in ("category", "subcategory"):
+        raise ValueError("请选择大类或子类")
+    with SYNC_LOCK:
+        sync_from_markdown()
+        terms = md_store.taxonomy()
+        category = category_name(payload.get("category"), 40, "大类")
+        if category not in terms:
+            raise ValueError("原大类不存在，请刷新页面")
+        subcategory = ""
+        if level == "subcategory":
+            subcategory = category_name(payload.get("subcategory"), 80, "子类")
+            if subcategory not in terms[category]:
+                raise ValueError("原子类不存在，请刷新页面")
+        target_category = target_subcategory = ""
+        if action == "rename":
+            name = category_name(payload.get("name"), 40 if level == "category" else 80, "新分类")
+            if level == "category":
+                if name in terms:
+                    raise ValueError("这个大类已存在")
+                terms = {name if key == category else key: subs for key, subs in terms.items()}
+            else:
+                if name in terms[category]:
+                    raise ValueError("这个子类已存在")
+                terms[category] = [name if value == subcategory else value for value in terms[category]]
+        elif action == "delete":
+            if level == "category" and len(terms) == 1:
+                raise ValueError("至少保留一个大类")
+            target_category = str(payload.get("target_category", "")).strip()
+            target_subcategory = str(payload.get("target_subcategory", "")).strip()
+            if target_category and (target_category not in terms or target_category == category and level == "category"):
+                raise ValueError("迁移目标大类无效")
+            if target_subcategory and (not target_category or target_subcategory not in terms[target_category]):
+                raise ValueError("迁移目标子类无效")
+            if level == "subcategory" and target_category and target_category != category:
+                raise ValueError("删除子类时只能迁到同一大类")
+            if level == "subcategory" and target_subcategory == subcategory:
+                raise ValueError("不能迁移到要删除的子类")
+        else:
+            raise ValueError("分类操作无效")
+
+        paths = sorted(md_store.PROMPTS.glob("*.md"))
+        items = [(path, md_store.parse(path)) for path in paths]
+        affected = [(path, item) for path, item in items if item["category"] == category and (level == "category" or item["subcategory"] == subcategory)]
+        if action == "delete" and affected and not target_category:
+            raise ValueError(f"有 {len(affected)} 条提示词使用此分类，请先选择迁移目标")
+        if action == "delete":
+            if level == "category":
+                del terms[category]
+            else:
+                terms[category].remove(subcategory)
+
+        original_taxonomy = md_store.TAXONOMY.read_text(encoding="utf-8")
+        original_files = {path: path.read_text(encoding="utf-8") for path, _ in items}
+        changed = []
+        for path, item in items:
+            next_item = item.copy()
+            if (path, item) in affected:
+                if action == "rename":
+                    if level == "category":
+                        next_item["category"] = name
+                    else:
+                        next_item["subcategory"] = name
+                else:
+                    next_item["category"] = target_category
+                    next_item["subcategory"] = target_subcategory
+                next_item["updated_at"] = now()
+                changed.append(next_item)
+            item["_next"] = next_item
+        try:
+            with connect() as db:
+                for path, item in items:
+                    new_content = md_store.render(item["_next"], terms)
+                    if original_files[path] != new_content:
+                        md_store.atomic_write(path, new_content)
+                md_store.atomic_write(md_store.TAXONOMY, json.dumps(terms, ensure_ascii=False, indent=2) + "\n")
+                for item in changed:
+                    db.execute("UPDATE prompts SET category=?,subcategory=?,updated_at=? WHERE id=?",
+                               (item["category"], item["subcategory"], item["updated_at"], item["id"]))
+                    db.execute("INSERT OR REPLACE INTO md_state VALUES (?,?)", (item["id"], md_store.digest(item)))
+        except Exception:
+            for path, content in original_files.items():
+                if path.read_text(encoding="utf-8") != content:
+                    md_store.atomic_write(path, content)
+            md_store.atomic_write(md_store.TAXONOMY, original_taxonomy)
+            raise
+        return {"taxonomy": terms, "moved": len(affected)}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -215,12 +324,10 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if route == "taxonomy":
                 payload = self.payload()
-                category = str(payload.get("category", "")).strip()
+                category = category_name(payload.get("category"), 40, "大类")
                 subcategory = str(payload.get("subcategory", "")).strip()
-                if not category or len(category) > 40 or any(ch in category for ch in "\r\n/\\"):
-                    raise ValueError("大类名称需为1至40字，不能包含换行或斜杠")
-                if len(subcategory) > 80 or any(ch in subcategory for ch in "\r\n/\\"):
-                    raise ValueError("子类名称不能超过80字或包含换行、斜杠")
+                if subcategory:
+                    subcategory = category_name(subcategory, 80, "子类")
                 with SYNC_LOCK:
                     sync_from_markdown()
                     terms = md_store.taxonomy()
@@ -244,8 +351,8 @@ class Handler(BaseHTTPRequestHandler):
                     values = validate(payload)
                     with connect() as db:
                         cur = db.execute("""INSERT INTO prompts
-                            (title,category,subcategory,tags,body,note,source,status,created_at,updated_at)
-                            VALUES (?,?,?,?,?,?,?,?,?,?)""", (*values, now(), now()))
+                            (title,category,subcategory,body,status,created_at,updated_at)
+                            VALUES (?,?,?,?,?,?,?)""", (*values, now(), now()))
                         row = db.execute("SELECT * FROM prompts WHERE id=?", (cur.lastrowid,)).fetchone()
                         write_web_change(db, serialize(row))
                 return self.json(serialize(row), 201)
@@ -265,12 +372,12 @@ class Handler(BaseHTTPRequestHandler):
                         for values, key in checked:
                             if key and db.execute("SELECT 1 FROM prompts WHERE import_key=?", (str(key),)).fetchone():
                                 continue
-                            body_hash = hashlib.sha256(values[4].encode()).hexdigest()
-                            if db.execute("SELECT 1 FROM prompts WHERE title=? AND body=?", (values[0], values[4])).fetchone():
+                            body_hash = hashlib.sha256(values[3].encode()).hexdigest()
+                            if db.execute("SELECT 1 FROM prompts WHERE title=? AND body=?", (values[0], values[3])).fetchone():
                                 continue
                             cur = db.execute("""INSERT INTO prompts
-                                (title,category,subcategory,tags,body,note,source,status,created_at,updated_at,import_key)
-                                VALUES (?,?,?,?,?,?,?,?,?,?,?)""", (*values, now(), now(), str(key) if key else f"restore:{body_hash}"))
+                                (title,category,subcategory,body,status,created_at,updated_at,import_key)
+                                VALUES (?,?,?,?,?,?,?,?)""", (*values, now(), now(), str(key) if key else f"restore:{body_hash}"))
                             item = serialize(db.execute("SELECT * FROM prompts WHERE id=?", (cur.lastrowid,)).fetchone())
                             changes.append({"item": item})
                             added += 1
@@ -280,6 +387,24 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, TypeError, json.JSONDecodeError, sqlite3.IntegrityError) as exc:
             return self.json({"error": str(exc)}, 400)
         self.send_error(404)
+
+    def do_PATCH(self):
+        route, _ = self.route()
+        if route != "taxonomy":
+            return self.send_error(404)
+        try:
+            return self.json(change_taxonomy(self.payload(), "rename"))
+        except (ValueError, TypeError, json.JSONDecodeError, sqlite3.Error) as exc:
+            return self.json({"error": str(exc)}, 400)
+
+    def do_DELETE(self):
+        route, _ = self.route()
+        if route != "taxonomy":
+            return self.send_error(404)
+        try:
+            return self.json(change_taxonomy(self.payload(), "delete"))
+        except (ValueError, TypeError, json.JSONDecodeError, sqlite3.Error) as exc:
+            return self.json({"error": str(exc)}, 400)
 
     def do_PUT(self):
         route, item_id = self.route()
@@ -291,7 +416,7 @@ class Handler(BaseHTTPRequestHandler):
                 sync_from_markdown()
                 values = validate(payload)
                 with connect() as db:
-                    cur = db.execute("""UPDATE prompts SET title=?,category=?,subcategory=?,tags=?,body=?,note=?,source=?,status=?,updated_at=? WHERE id=?""", (*values, now(), item_id))
+                    cur = db.execute("""UPDATE prompts SET title=?,category=?,subcategory=?,body=?,status=?,updated_at=? WHERE id=?""", (*values, now(), item_id))
                     if not cur.rowcount:
                         return self.json({"error": "未找到提示词"}, 404)
                     row = db.execute("SELECT * FROM prompts WHERE id=?", (item_id,)).fetchone()

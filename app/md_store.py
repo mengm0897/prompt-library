@@ -15,7 +15,8 @@ DEFAULT = {
     "工作": ["整理信息"],
     "生活": [],
 }
-FIELDS = ("id", "title", "category", "subcategory", "tags", "status", "source", "note", "created_at", "updated_at", "import_key")
+FIELDS = ("id", "title", "category", "subcategory", "status", "created_at", "updated_at", "import_key")
+LEGACY_FIELDS = {"tags", "source", "note"}
 
 
 def atomic_write(path, content):
@@ -74,7 +75,7 @@ def parse(path):
         if not line or line.startswith("#"):
             continue
         key, sep, raw = line.partition(": ")
-        if not sep or key not in FIELDS or key in item:
+        if not sep or key not in (*FIELDS, *LEGACY_FIELDS) or key in item:
             raise ValueError(f"{path.name}：元数据行无效：{line[:80]}")
         try:
             item[key] = json.loads(raw)
@@ -86,8 +87,8 @@ def parse(path):
     item["body"] = content[match.end():]
     if not isinstance(item["id"], int) or path != path_for(item["id"]):
         raise ValueError(f"{path.name}：文件名和 id 不一致")
-    if not isinstance(item["tags"], list):
-        raise ValueError(f"{path.name}：tags 必须是列表")
+    for key in LEGACY_FIELDS:
+        item.pop(key, None)
     check_selection(item)
     return item
 
