@@ -1,20 +1,74 @@
-.taxonomy-help{color:#647b89;font-size:14px;line-height:1.6}
-.taxonomy-list{display:grid;gap:8px;max-height:32vh;overflow:auto;margin:18px 0;padding-right:4px}
-.taxonomy-row{display:grid;gap:8px;background:#f4f8f9;border:1px solid #e3edef;border-radius:9px;padding:10px 12px}
-.taxonomy-row-head,.taxonomy-sublist>div{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.taxonomy-sublist{display:grid;gap:5px;padding-left:12px;border-left:2px solid #d5e6e8}
-.taxonomy-link{border:0;background:transparent;color:#176e79;font-size:12px;padding:5px 7px}
-.taxonomy-link:hover{text-decoration:underline}
-.taxonomy-row strong{font-size:14px;color:#1d5661}
-.taxonomy-row span{font-size:13px;color:#607684;line-height:1.5}
-.taxonomy-form{display:flex;align-items:end;gap:10px;margin:14px 0}
-.taxonomy-form label{flex:1;display:grid;gap:5px;font-size:13px;color:#4a6473}
-.taxonomy-form input,.taxonomy-form select{border:1px solid #d7e3e7;border-radius:9px;background:white;padding:10px;color:#233b4c;width:100%}
-.taxonomy-action{display:grid;gap:10px;border:1px solid #a9cdd0;background:#f8fcfc;border-radius:10px;padding:15px;margin:16px 0}
-.taxonomy-action[hidden],.taxonomy-action label[hidden]{display:none}
-.taxonomy-action strong{color:#1d5661}
-.taxonomy-action p{margin:0;color:#607684;font-size:13px}
-.taxonomy-action label{display:grid;gap:5px;font-size:13px;color:#4a6473}
-.taxonomy-action input,.taxonomy-action select{border:1px solid #d7e3e7;border-radius:9px;background:white;padding:10px;color:#233b4c;width:100%}
-.taxonomy-action-buttons{display:flex;justify-content:flex-end;gap:8px}
-@media(max-width:540px){.taxonomy-form{display:grid}.taxonomy-form button{width:100%}}
+.taxonomy-list {
+  display: grid;
+  gap: var(--space-3);
+  overflow: auto;
+  min-width: 0;
+  max-height: 48vh;
+  padding: 2px 4px 2px 2px;
+}
+.taxonomy-row {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  background: var(--color-surface);
+}
+.taxonomy-entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-3);
+  min-height: 38px;
+}
+.taxonomy-row-head strong { font-size: 15px; font-weight: 700; }
+.taxonomy-controls { display: inline-flex; align-items: center; gap: var(--space-2); }
+.taxonomy-link {
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 5px 9px;
+  background: transparent;
+  color: var(--color-accent);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.taxonomy-link:hover { background: var(--color-accent-soft); }
+.taxonomy-link--danger { color: var(--color-danger); }
+.taxonomy-link--danger:hover { background: #fbefef; }
+.taxonomy-sublist {
+  display: grid;
+  margin-left: var(--space-4);
+  border-left: 2px solid var(--color-line);
+  padding-left: var(--space-4);
+}
+.taxonomy-sublist > .taxonomy-entry {
+  border-top: 1px solid var(--color-line);
+  padding: var(--space-2) 0;
+  color: var(--color-muted);
+}
+.taxonomy-sublist > .taxonomy-entry:first-child { border-top: 0; }
+.taxonomy-action {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  border: 1px solid var(--color-lilac);
+  border-radius: var(--radius-sm);
+  margin: var(--space-2) 0;
+  padding: var(--space-4);
+  background: var(--color-lilac-soft);
+}
+.taxonomy-action strong { font-size: var(--text-base); font-weight: 700; }
+.taxonomy-action p { margin: 0; color: var(--color-muted); font-size: var(--text-sm); }
+.taxonomy-action-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+.taxonomy-add { display: grid; gap: var(--space-3); border-top: 1px solid var(--color-line); margin-top: var(--space-5); padding-top: var(--space-5); }
+.taxonomy-form { display: flex; align-items: end; gap: var(--space-2); }
+.taxonomy-form label { flex: 1; }
+.taxonomy-form button { min-width: 68px; }
+@media (max-width: 540px) {
+  .taxonomy-entry { align-items: flex-start; flex-direction: column; gap: var(--space-1); }
+  .taxonomy-controls { gap: var(--space-1); }
+  .taxonomy-form { align-items: stretch; flex-direction: column; }
+}

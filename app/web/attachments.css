@@ -1,1 +1,18 @@
-.attachments{display:flex;flex-wrap:wrap;gap:12px;margin-top:16px}.attachments:empty{display:none}.attachments a{display:flex;align-items:center;gap:10px;border:1px solid #dce6e9;background:#f7fafb;border-radius:9px;padding:9px 12px;color:#216e7c;text-decoration:none;font-size:13px;max-width:100%;overflow-wrap:anywhere}.attachments a:hover{text-decoration:underline}.attachments img{width:54px;height:54px;object-fit:cover;border-radius:5px}
+.attachments { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-4); }
+.attachments:empty { display: none; }
+.attachments a {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-muted);
+  color: var(--color-accent);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+.attachments a:hover { text-decoration: underline; }
+.attachments img { width: 54px; height: 54px; border-radius: 5px; object-fit: cover; }
