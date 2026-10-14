@@ -129,6 +129,30 @@ def write_web_change(db, item):
     db.execute("INSERT OR REPLACE INTO md_state VALUES (?,?)", (item["id"], md_store.digest(item)))
 
 
+def delete_prompt(item_id):
+    """Remove one Markdown source and its index row; restore the file if the DB fails."""
+    with SYNC_LOCK:
+        sync_from_markdown()
+        with connect() as db:
+            row = db.execute("SELECT id FROM prompts WHERE id=?", (item_id,)).fetchone()
+            if row is None:
+                return False
+            path = md_store.path_for(item_id)
+            original = path.read_text(encoding="utf-8") if path.exists() else None
+            if original is not None:
+                path.unlink()
+            try:
+                db.execute("DELETE FROM md_state WHERE id=?", (item_id,))
+                db.execute("DELETE FROM prompts WHERE id=?", (item_id,))
+                db.commit()
+            except Exception:
+                db.rollback()
+                if original is not None:
+                    md_store.atomic_write(path, original)
+                raise
+    return True
+
+
 def category_name(value, limit, label):
     name = str(value or "").strip()
     if not name or len(name) > limit or any(ch in name for ch in "\r\n/\\"):
@@ -398,13 +422,19 @@ class Handler(BaseHTTPRequestHandler):
             return self.json({"error": str(exc)}, 400)
 
     def do_DELETE(self):
-        route, _ = self.route()
-        if route != "taxonomy":
-            return self.send_error(404)
+        route, item_id = self.route()
         try:
-            return self.json(change_taxonomy(self.payload(), "delete"))
-        except (ValueError, TypeError, json.JSONDecodeError, sqlite3.Error) as exc:
+            if route == "taxonomy":
+                return self.json(change_taxonomy(self.payload(), "delete"))
+            if route == "item":
+                if not delete_prompt(item_id):
+                    return self.json({"error": "未找到提示词"}, 404)
+                return self.json({"deleted": item_id})
+        except (ValueError, TypeError, json.JSONDecodeError) as exc:
             return self.json({"error": str(exc)}, 400)
+        except (OSError, sqlite3.Error) as exc:
+            return self.json({"error": f"删除失败：{exc}"}, 500)
+        self.send_error(404)
 
     def do_PUT(self):
         route, item_id = self.route()

@@ -84,6 +84,35 @@ $('#rawViewBtn').onclick=()=>setReaderMode('raw');
 $('#choosePromptFile').onclick=()=>$('#promptFile').click();
 $('#promptFile').onchange=async(e)=>{const file=e.target.files?.[0];if(!file)return;const form=$('#promptForm');form.elements.body.value=await file.text();if(!form.elements.title.value.trim())form.elements.title.value=file.name.replace(/\.(md|txt)$/i,'');toast('正文已载入');e.target.value=''};
 $('#archiveBtn').onclick=async()=>{const item=state.items.find(x=>x.id===state.selected);const next={...item,status:item.status==='archived'?'active':'archived'};try{await api(`/api/prompts/${item.id}`,{method:'PUT',body:JSON.stringify(next)});$('#detailDialog').close();await load();toast(next.status==='archived'?'已归档':'已恢复')}catch(error){toast(error.message)}};
+$('#deleteBtn').onclick=()=>{
+  const item=state.items.find(x=>x.id===state.selected);
+  if(!item)return;
+  $('#deletePromptTitle').textContent=`「${item.title}」`;
+  $('#detailDialog').close();
+  $('#deleteDialog').showModal();
+};
+let deletingPrompt=false;
+$('#deleteDialog').addEventListener('cancel',event=>{if(deletingPrompt)event.preventDefault()});
+$('#deleteDialog').addEventListener('close',()=>{
+  if(state.selected!==null)openDetail(state.selected);
+});
+$('#confirmDeleteBtn').onclick=async()=>{
+  const item=state.items.find(x=>x.id===state.selected);
+  if(!item)return;
+  const button=$('#confirmDeleteBtn');
+  const cancel=$('#deleteDialog [data-close]');
+  deletingPrompt=true;
+  button.disabled=true;
+  cancel.disabled=true;
+  try{
+    await api(`/api/prompts/${item.id}`,{method:'DELETE'});
+    state.selected=null;
+    $('#deleteDialog').close();
+    await load();
+    toast('提示词已删除');
+  }catch(error){toast(error.message)}
+  finally{deletingPrompt=false;button.disabled=false;cancel.disabled=false}
+};
 $('#copyBtn').onclick=async()=>{try{await navigator.clipboard.writeText(state.items.find(x=>x.id===state.selected).body);toast('正文已复制')}catch{toast('复制失败，请手动选择正文复制')}};
 $('#promptForm').onsubmit=async(e)=>{e.preventDefault();const form=e.target;const value={title:form.elements.title.value,category:form.elements.category.value,subcategory:form.elements.subcategory.value,status:form.elements.status.value,body:form.elements.body.value};const button=form.querySelector('[type=submit]');button.disabled=true;try{const path=state.editing?`/api/prompts/${state.editing}`:'/api/prompts';const result=await api(path,{method:state.editing?'PUT':'POST',body:JSON.stringify(value)});state.returnToDetail=null;$('#editDialog').close();await load();toast('提示词已保存');openDetail(result.id)}catch(error){toast(error.message)}finally{button.disabled=false}};
 function restoreDetailAfterEdit(){if(state.returnToDetail!==null){const id=state.returnToDetail;state.returnToDetail=null;openDetail(id)}}
@@ -93,4 +122,4 @@ $('#exportBtn').onclick=()=>{window.location.href='/api/backup'};
 $('#importBtn').onclick=()=>$('#importFile').click();
 $('#importFile').onchange=async(e)=>{const file=e.target.files?.[0];if(!file)return;try{const data=JSON.parse(await file.text());const result=await api('/api/backup',{method:'POST',body:JSON.stringify(data)});await load();toast(`导入完成，新增 ${result.added} 条`)}catch(error){toast(error.message)}e.target.value=''};
 load();
-setInterval(()=>{if(!document.hidden&&!['editDialog','detailDialog','taxonomyDialog'].some(id=>$('#'+id).open))load()},5000);
+setInterval(()=>{if(!document.hidden&&!['editDialog','detailDialog','taxonomyDialog','deleteDialog'].some(id=>$('#'+id).open))load()},5000);

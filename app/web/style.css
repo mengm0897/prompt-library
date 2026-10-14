@@ -107,7 +107,7 @@ main { width: 100%; max-width: 1240px; margin: 0 auto; padding: 52px clamp(28px,
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); margin-bottom: var(--space-8); }
 .topbar h1 { margin: 0; font-size: var(--text-page); line-height: 1.25; letter-spacing: -.02em; }
 .topbar-actions { display: flex; align-items: center; gap: var(--space-2); }
-.primary, .quiet, .danger {
+.primary, .quiet, .danger, .danger-outline {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -125,6 +125,8 @@ main { width: 100%; max-width: 1240px; margin: 0 auto; padding: 52px clamp(28px,
 .quiet:hover { background: var(--color-surface-muted); }
 .danger { border-color: var(--color-danger); background: var(--color-danger); color: white; }
 .danger:hover { background: #852b3c; }
+.danger-outline { border: 1px solid var(--color-danger); background: var(--color-surface); color: var(--color-danger); }
+.danger-outline:hover { background: #fbefef; }
 button:disabled { cursor: wait; opacity: .6; }
 
 .toolbar { display: flex; gap: var(--space-3); margin-bottom: var(--space-8); }
@@ -187,6 +189,11 @@ button:disabled { cursor: wait; opacity: .6; }
 dialog { width: min(760px, calc(100vw - 30px)); max-width: calc(100vw - 30px); min-width: 0; max-height: min(90vh, 1000px); overflow-x: hidden; border: 0; border-radius: var(--radius-lg); padding: 0; color: var(--color-text); box-shadow: var(--shadow-dialog); }
 dialog::backdrop { background: #242c4380; backdrop-filter: blur(3px); }
 .detail-dialog, .edit-dialog { padding: var(--space-8); }
+.confirm-dialog { width: min(520px, calc(100vw - 30px)); padding: var(--space-8); }
+.confirm-dialog h2 { margin: 0 0 var(--space-4); font-size: var(--text-xl); }
+.confirm-dialog p { overflow-wrap: anywhere; margin: 0 0 var(--space-3); line-height: 1.65; }
+#deletePromptTitle { font-weight: 700; }
+#deleteDialogHelp { color: var(--color-muted); }
 .dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-5); }
 .dialog-head h2 { overflow-wrap: anywhere; margin: 0 0 var(--space-5); font-size: var(--text-xl); line-height: 1.35; }
 .icon-close { flex: none; width: 36px; height: 36px; border: 0; border-radius: var(--radius-sm); background: var(--color-surface-muted); color: var(--color-muted); font-size: 24px; line-height: 1; }
@@ -223,7 +230,7 @@ dialog::backdrop { background: #242c4380; backdrop-filter: blur(3px); }
   .topbar-actions { width: 100%; }
   .topbar-actions button { flex: 1; }
   .cards, .form-grid { grid-template-columns: 1fr; }
-  .detail-dialog, .edit-dialog { padding: var(--space-5); }
+  .detail-dialog, .edit-dialog, .confirm-dialog { padding: var(--space-5); }
   .dialog-actions { flex-wrap: wrap; }
   .dialog-actions button { flex: 1; }
 }

@@ -125,8 +125,28 @@ with tempfile.TemporaryDirectory(prefix="prompt-clean-start-") as directory:
         assert "旧标签" not in legacy_file.read_text(encoding="utf-8")
         with sqlite3.connect(root / "data" / "prompts.sqlite3") as db:
             assert "tags" not in {row[1] for row in db.execute("PRAGMA table_info(prompts)")}
+        untouched = (root / "prompts" / "0001.md").read_bytes()
+        assert request(base, "/api/prompts/3", "DELETE") == {"deleted": 3}
+        assert not legacy_file.exists()
+        assert (root / "prompts" / "0001.md").read_bytes() == untouched
+        assert len(request(base, "/api/prompts")["prompts"]) == 2
+        assert len(request(base, "/api/backup")["prompts"]) == 2
+        for method in ("GET", "DELETE"):
+            try:
+                request(base, "/api/prompts/3", method)
+                raise AssertionError("Deleted prompt was still available")
+            except HTTPError as error:
+                assert error.code == 404
     finally:
         process.terminate()
         process.wait(timeout=5)
 
-print("通过：公开代码与两条虚构示例可启动，新增后重启可读回 Markdown 和 SQLite 索引")
+    process, base = start(root, port)
+    try:
+        assert len(request(base, "/api/prompts")["prompts"]) == 2
+        assert not legacy_file.exists()
+    finally:
+        process.terminate()
+        process.wait(timeout=5)
+
+print("通过：首次启动、分类迁移、备份、永久删除与重启读回均正常")
