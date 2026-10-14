@@ -8,6 +8,7 @@
 /docs/*
 !/docs/MVP功能与结构.md
 !/docs/界面组件与文案规则.md
+!/docs/视觉基准.md
 
 !/app/
 /app/*
