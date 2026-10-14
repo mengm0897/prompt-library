@@ -61,7 +61,7 @@ def serialize(row):
 
 def validate(payload):
     if not isinstance(payload, dict):
-        raise ValueError("请输入有效的提示词内容")
+        raise ValueError("请输入有效的 Prompt 内容")
     title = str(payload.get("title", "")).strip()
     body = str(payload.get("body", ""))
     category = str(payload.get("category", next(iter(md_store.taxonomy()))))
@@ -209,7 +209,7 @@ def change_taxonomy(payload, action):
         items = [(path, md_store.parse(path)) for path in paths]
         affected = [(path, item) for path, item in items if item["category"] == category and (level == "category" or item["subcategory"] == subcategory)]
         if action == "delete" and affected and not target_category:
-            raise ValueError(f"有 {len(affected)} 条提示词使用此分类，请先选择迁移目标")
+            raise ValueError(f"有 {len(affected)} 条 Prompt 使用此分类，请先选择迁移目标")
         if action == "delete":
             if level == "category":
                 del terms[category]
@@ -316,7 +316,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.json({"error": f"Markdown 同步失败：{exc}"}, 409)
             with connect() as db:
                 row = db.execute("SELECT * FROM prompts WHERE id=?", (item_id,)).fetchone()
-            return self.json(serialize(row) if row else {"error": "未找到提示词"}, 200 if row else 404)
+            return self.json(serialize(row) if row else {"error": "未找到 Prompt"}, 200 if row else 404)
         path = urlparse(self.path).path
         if path.startswith("/attachments/"):
             filename = unquote(path[len("/attachments/"):])
@@ -428,7 +428,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.json(change_taxonomy(self.payload(), "delete"))
             if route == "item":
                 if not delete_prompt(item_id):
-                    return self.json({"error": "未找到提示词"}, 404)
+                    return self.json({"error": "未找到 Prompt"}, 404)
                 return self.json({"deleted": item_id})
         except (ValueError, TypeError, json.JSONDecodeError) as exc:
             return self.json({"error": str(exc)}, 400)
@@ -448,7 +448,7 @@ class Handler(BaseHTTPRequestHandler):
                 with connect() as db:
                     cur = db.execute("""UPDATE prompts SET title=?,category=?,subcategory=?,body=?,status=?,updated_at=? WHERE id=?""", (*values, now(), item_id))
                     if not cur.rowcount:
-                        return self.json({"error": "未找到提示词"}, 404)
+                        return self.json({"error": "未找到 Prompt"}, 404)
                     row = db.execute("SELECT * FROM prompts WHERE id=?", (item_id,)).fetchone()
                     write_web_change(db, serialize(row))
             return self.json(serialize(row))
@@ -467,5 +467,5 @@ if __name__ == "__main__":
     with connect() as db:
         count = db.execute("SELECT COUNT(*) FROM prompts").fetchone()[0]
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
-    print(f"Prompt 库： http://127.0.0.1:{server.server_port}  （{count}条）", flush=True)
+    print(f"Prompt 管理器： http://127.0.0.1:{server.server_port}  （{count}条）", flush=True)
     server.serve_forever()
